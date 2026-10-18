@@ -64,7 +64,7 @@ textarea{min-height:70px;margin-top:8px}
   <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option></select>
  </div>
  <div class="bar">
-  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.3</span>
+  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.4</span>
   <button class="act" id="bCsv">Export CSV</button><button class="act" id="bJson">Backup</button><button class="act" id="bRestore">Restore</button><input type="file" id="rf" accept=".json,application/json" class="hide"><button class="act" id="bReset">New session</button>
  </div>
 </header>
@@ -115,6 +115,7 @@ function load(){try{var j=localStorage.getItem(KEY);if(j){var o=JSON.parse(j);if
 function mig(o){o.batters.forEach(function(b){b.pitches.forEach(function(p){['r','k','h'].forEach(function(f){if(p[f]==='0')p[f]='N'})})});return o}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function B(){return S.batters[S.cur]}
+function showInn(){return S.m.session=='Game'||S.batters.some(function(b){return b.endInn})}
 function inns(){var n=1,a=[];S.batters.forEach(function(b){a.push(n);if(b.endInn)n++});return a}
 function reset(){D={s:D?D.s:'',t:'',z:'',r:'',k:'',p:'',h:'',x:'',u:'',ip:''};edit=-1}
 function lbl(v){return v=='-'?'\u2212':v}
@@ -123,13 +124,13 @@ function renderEd(){
  ['s','t','r','k','p','h','u','x'].forEach(function(f){seg('f_'+f,f,OPT[f])});
  $('f_z').innerHTML=[1,2,3,4,5,6,7,8,9].map(function(n){return'<button data-f="z" data-v="'+n+'" class="'+(D.z==n?'on':'')+'">'+n+'</button>'}).join('');
  $('hand').innerHTML=['LHH','RHH'].map(function(v){return'<button data-hand="'+v+'" class="'+(B().h==v?'on':'')+'" style="min-width:80px;min-height:48px;border-radius:8px;border:1px solid var(--line);background:'+(B().h==v?'var(--acc)':'var(--card)')+';color:'+(B().h==v?'var(--accT)':'var(--ink)')+';font-weight:600">'+v+'</button>'}).join('');
- seg('f_ip','ip',['1B','2B','3B','HR','E','FC']);var G=S.m.session=='Game';$('endInn').classList.toggle('hide',!G);$('endNext').classList.toggle('hide',!G);$('endInn').classList.toggle('on',!!B().endInn);$('endInn').textContent=B().endInn?'Inning ends after this batter (on)':'End inning after this batter';$('ipw').classList.toggle('hide',D.x!='In play');$('ipin').value=D.ip||'';
+ seg('f_ip','ip',['1B','2B','3B','HR','E','FC']);$('endInn').classList.remove('hide');$('endNext').classList.remove('hide');$('endInn').classList.toggle('on',!!B().endInn);$('endInn').textContent=B().endInn?'Inning ends after this batter (on)':'End inning after this batter';$('ipw').classList.toggle('hide',D.x!='In play');$('ipin').value=D.ip||'';
  $('add').textContent=edit>=0?'Update pitch '+(edit+1):'Add pitch';
  $('del').classList.toggle('hide',edit<0);$('cancel').classList.toggle('hide',edit<0);
 }
 function chip(p,i){return(i+1)+' '+(p.t||'\u2013')+(p.z?' Z'+p.z:'')+(p.r?' R'+lbl(p.r):'')+(p.k?' B'+lbl(p.k):'')+(p.p?' '+p.p:'')+(p.h?' T'+lbl(p.h):'')+(p.u?' '+p.u:'')+(p.x?' '+p.x+(p.ip?' '+p.ip:''):'')}
 function renderB(){var IN=inns();
- $('bl').innerHTML=S.batters.map(function(b,i){return'<button data-b="'+i+'" class="'+(i==S.cur?'on':'')+'">Batter '+(i+1)+' '+(b.h||'')+'<small>'+b.pitches.length+' pitches'+(S.m.session=='Game'?' \u00b7 Inn '+IN[i]+(b.endInn?' (end)':''):'')+'</small></button>'}).join('')+'<button data-newb="1">+ New batter</button>';
+ $('bl').innerHTML=S.batters.map(function(b,i){return'<button data-b="'+i+'" class="'+(i==S.cur?'on':'')+'">Batter '+(i+1)+' '+(b.h||'')+'<small>'+b.pitches.length+' pitches'+(showInn()?' \u00b7 Inn '+IN[i]+(b.endInn?' (end)':''):'')+'</small></button>'}).join('')+'<button data-newb="1">+ New batter</button>';
  $('pt').textContent='Batter '+(S.cur+1)+' pitches ('+B().pitches.length+')';
  $('chips').innerHTML=B().pitches.length?B().pitches.map(function(p,i){return'<button data-p="'+i+'" class="'+(i==edit?'on':'')+'">'+chip(p,i)+'</button>'}).join(''):'<span style="color:var(--mut)">No pitches yet. Chart one above and tap Add pitch.</span>';
  $('noteB').value=B().note;
@@ -149,7 +150,7 @@ function calc(){
  $('cs').innerHTML=hd('Stance')+OPT.s.map(function(s){return ln(s,R.filter(function(r){return r.s==s}))}).join('')+'</tbody>';
  $('ch').innerHTML=hd('Batter')+['LHH','RHH'].map(function(s){return ln(s,R.filter(function(r){return r.b==s}))}).join('')+'</tbody>';
  var IN=inns(),m={};S.batters.forEach(function(b,i){(m[IN[i]]=m[IN[i]]||[]).push(b)});
- $('cardInn').classList.toggle('hide',S.m.session!='Game');
+ $('cardInn').classList.toggle('hide',!showInn());
  $('ci').innerHTML=hd('Inning').replace('<th>Pitches</th>','<th>Batters</th><th>Pitches</th>')+Object.keys(m).map(function(n){var ps=[];m[n].forEach(function(b){b.pitches.forEach(function(p){ps.push(p)})});return ln('Inning '+n,ps).replace('</td><td>','</td><td>'+m[n].length+'</td><td>')}).join('')+'</tbody>';
  function dist(el,label,f,o){var n=R.filter(function(r){return r[f]}).length;$(el).innerHTML='<thead><tr><th>'+label+'</th><th>Count</th><th>%</th></tr></thead><tbody>'+o.map(function(v){var c=cnt(R,f,v);return'<tr><td>'+v+'</td><td>'+c+'</td><td>'+(n?Math.round(1000*c/n)/10+'%':'\u2013')+'</td></tr>'}).join('')+'<tr><td>Pitches recorded</td><td>'+n+'</td><td></td></tr></tbody>'}
  dist('cpt','Pitch type','t',OPT.t);dist('cst','Stance','s',OPT.s);
@@ -158,7 +159,7 @@ function calc(){
 function csv(){
  var q=function(x){return'"'+String(x).replace(/"/g,'""')+'"'};
  var L=[['Catcher',S.m.catcher,'Pitcher',S.m.pitcher,'Date',S.m.date,'Session',S.m.session].map(q).join(','),'Batter,Inning,Hand,Pitch,Stance,Type,Zone,REC,BLK,PB/WP,THR,Umpire,Result,Play'];
- S.batters.forEach(function(b,i){b.pitches.forEach(function(p,j){L.push([i+1,S.m.session=='Game'?inns()[i]:'',b.h,j+1,p.s,p.t,p.z,p.r,p.k,p.p,p.h,p.u||'',p.x||'',q(p.ip||'')].join(','))});if(b.note)L.push([i+1,'','','note',q(b.note)].join(','))});
+ S.batters.forEach(function(b,i){b.pitches.forEach(function(p,j){L.push([i+1,showInn()?inns()[i]:'',b.h,j+1,p.s,p.t,p.z,p.r,p.k,p.p,p.h,p.u||'',p.x||'',q(p.ip||'')].join(','))});if(b.note)L.push([i+1,'','','note',q(b.note)].join(','))});
  L.push('Session notes,'+q(S.notes));return L.join('\n');
 }
 function dl(txt,name,type){try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove()}catch(e){alert('Download is not available here.')}}
