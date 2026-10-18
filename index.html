@@ -34,7 +34,7 @@ button{font:inherit;color:var(--ink)}
 .seg button.on{background:var(--acc);color:var(--accT);border-color:var(--acc)}
 .seg button.on[data-v="+"]{background:var(--pos);color:#fff;border-color:var(--pos)}
 .seg button.on[data-v="-"],.seg button.on[data-v=PB],.seg button.on[data-v=WP]{background:var(--neg);color:#fff;border-color:var(--neg)}
-.seg button.on[data-v="0"]{background:var(--neu);color:#fff;border-color:var(--neu)}
+.seg button.on[data-v="N"]{background:var(--neu);color:#fff;border-color:var(--neu)}
 .zone{display:grid;grid-template-columns:repeat(3,64px);gap:6px}
 .zone button{height:64px;border-radius:8px;border:1px solid var(--line);background:var(--card);font:700 20px inherit}
 .zone button.on{background:var(--acc);color:var(--accT);border-color:var(--acc)}
@@ -107,11 +107,12 @@ textarea{min-height:70px;margin-top:8px}
 
 <script>
 var $=function(i){return document.getElementById(i)},KEY='catcherEval.v2',S;
-var OPT={s:['LKD','RKD','2PP','2PS'],t:['FB','CB','SL','CH','CT','SP'],r:['+','0','-'],k:['+','0','-'],p:['PB','WP'],h:['+','0','-'],x:['Whiff','Foul tip','Foul','In play'],u:['Ball','Strike']};
+var OPT={s:['LKD','RKD','2PP','2PS'],t:['FB','CB','SL','CH','CT','SP'],r:['+','N','-'],k:['+','N','-'],p:['PB','WP'],h:['+','N','-'],x:['Whiff','Foul tip','Foul','In play'],u:['Ball','Strike']};
 var D,edit=-1,inkB,inkS;
 function newB(){return{h:'',pitches:[],ink:'',note:'',endInn:false}}
 function blank(){return{m:{catcher:'',pitcher:'',date:new Date().toISOString().slice(0,10),session:'Bullpen'},batters:[newB()],cur:0,sink:'',notes:''}}
-function load(){try{var j=localStorage.getItem(KEY);if(j){var o=JSON.parse(j);if(o&&o.batters&&o.batters.length)return o}}catch(e){}return blank()}
+function load(){try{var j=localStorage.getItem(KEY);if(j){var o=JSON.parse(j);if(o&&o.batters&&o.batters.length)return mig(o)}}catch(e){}return blank()}
+function mig(o){o.batters.forEach(function(b){b.pitches.forEach(function(p){['r','k','h'].forEach(function(f){if(p[f]==='0')p[f]='N'})})});return o}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function B(){return S.batters[S.cur]}
 function inns(){var n=1,a=[];S.batters.forEach(function(b){a.push(n);if(b.endInn)n++});return a}
@@ -134,14 +135,14 @@ function renderB(){var IN=inns();
  $('noteB').value=B().note;
 }
 function showB(i){S.cur=i;reset();save();renderEd();renderB();inkB.load();calc()}
-function tally(rs,f){var p=0,z=0,m=0;rs.forEach(function(r){var v=r[f];if(v=='+')p++;else if(v=='0')z++;else if(v=='-')m++});return{p:p,z:z,m:m,o:p+z+m}}
+function tally(rs,f){var p=0,z=0,m=0;rs.forEach(function(r){var v=r[f];if(v=='+')p++;else if(v=='N')z++;else if(v=='-')m++});return{p:p,z:z,m:m,o:p+z+m}}
 function cnt(rs,f,v){return rs.filter(function(r){return r[f]==v}).length}
 function pct(t){return t.o?Math.round(100*t.p/t.o)+'%':'\u2013'}
 function all(){var a=[];S.batters.forEach(function(b){b.pitches.forEach(function(p){var c={b:b.h};for(var k in p)c[k]=p[k];a.push(c)})});return a}
 function calc(){
  var R=all(),re=tally(R,'r'),bl=tally(R,'k'),th=tally(R,'h');
  function box(t,a,b){return'<div><b>'+t+'</b><span>'+a+'</span><small>'+b+'</small></div>'}
- function g(t){return[t.p+' + / '+t.z+' 0 / '+t.m+' \u2212',t.o+' opp, '+pct(t)+' positive']}
+ function g(t){return[t.p+' + / '+t.z+' N / '+t.m+' \u2212',t.o+' opp, '+pct(t)+' positive']}
  $('tot').innerHTML=box('Pitches charted',R.length,S.batters.length+' batters')+box('Receiving',g(re)[0],g(re)[1])+box('Blocking',g(bl)[0],g(bl)[1])+box('Throw downs',g(th)[0],g(th)[1])+box('Passed balls',cnt(R,'p','PB'),'')+box('Wild pitches',cnt(R,'p','WP'),'')+box('Called balls',cnt(R,'u','Ball'),'')+box('Called strikes',cnt(R,'u','Strike'),'')+box('Whiffs',cnt(R,'x','Whiff'),'')+box('Foul tips',cnt(R,'x','Foul tip'),'')+box('Fouls',cnt(R,'x','Foul'),'')+box('Balls in play',cnt(R,'x','In play'),'');
  function hd(x){return'<thead><tr><th>'+x+'</th><th>Pitches</th><th>REC +/opp</th><th>BLK +/opp</th><th>PB</th><th>WP</th><th>THR +/opp</th></tr></thead><tbody>'}
  function ln(l,rs){var a=tally(rs,'r'),b=tally(rs,'k'),c=tally(rs,'h');return'<tr><td>'+l+'</td><td>'+rs.length+'</td><td>'+a.p+' / '+a.o+'</td><td>'+b.p+' / '+b.o+'</td><td>'+cnt(rs,'p','PB')+'</td><td>'+cnt(rs,'p','WP')+'</td><td>'+c.p+' / '+c.o+'</td></tr>'}
@@ -201,8 +202,9 @@ $('notes').addEventListener('input',function(){S.notes=this.value;save()});
 $('bCsv').onclick=function(){dl(csv(),'catcher-eval-'+S.m.date+'.csv','text/csv')};
 $('bJson').onclick=function(){dl(JSON.stringify(S),'catcher-eval-backup-'+S.m.date+'.json','application/json')};
 $('bReset').onclick=function(){if(confirm('Clear everything and start a new session? Export or back up first if you need this one.')){S=blank();D=null;save();init()}};
+$('m_session').addEventListener('change',function(){S.m.session=this.value;save();renderEd();renderB();calc()});
 $('bRestore').onclick=function(){$('rf').click()};
-$('rf').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);if(!o.m||!o.batters||!o.batters.length)throw 0;if(confirm('Replace the current session with this backup?')){S=o;S.cur=0;D=null;save();init()}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f);this.value=''};
+$('rf').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);if(!o.m||!o.batters||!o.batters.length)throw 0;if(confirm('Replace the current session with this backup?')){S=mig(o);S.cur=0;D=null;save();init()}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f);this.value=''};
 function init(){reset();$('m_catcher').value=S.m.catcher;$('m_pitcher').value=S.m.pitcher;$('m_date').value=S.m.date;$('m_session').value=S.m.session;$('notes').value=S.notes;
  inkB=inkB||mkInk($('inkB'),function(){return B().ink},function(v){B().ink=v;save()});
  inkS=inkS||mkInk($('inkS'),function(){return S.sink},function(v){S.sink=v;save()});
