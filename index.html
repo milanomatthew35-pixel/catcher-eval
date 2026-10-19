@@ -70,7 +70,7 @@ header{flex:none;padding:6px 0}
 #sum .wide{grid-column:1/-1}
 .card{padding:10px;margin-bottom:0}.card h3{margin:0 0 6px;font-size:15px}
 .wrap{display:grid;grid-template-columns:118px minmax(0,1.35fr) minmax(300px,1fr);gap:10px;height:100%;margin-top:0;padding:8px 0}
-.wrap>*{min-height:0}
+.wrap>*{min-height:0;min-width:0}
 .bl{overflow-y:auto;height:100%}.bl button{padding:8px;margin-bottom:5px}
 .edit{display:flex;flex-direction:column;overflow:auto}
 .top{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
@@ -87,14 +87,22 @@ header{flex:none;padding:6px 0}
 .side{min-height:0;overflow:hidden}
 .fill{flex:1;min-height:0;display:flex;flex-direction:column}
 .fill .cw{flex:1;min-height:0}
-.cw{display:flex;justify-content:center;align-items:flex-start}
+.cw{width:100%;min-width:0;height:clamp(240px,38dvh,480px);overflow:hidden;border:1px solid var(--line);border-radius:8px}
+.fill .cw{height:auto}
+#inkB,#inkS{width:100%;min-width:0}
+.itb{flex-wrap:wrap;flex-shrink:0}
 .itb{margin-bottom:4px}.itb button{padding:6px 10px}
-canvas{aspect-ratio:auto}
+canvas{width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0}
 textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
 #notes{height:90px;resize:vertical}
 .tot{grid-template-columns:repeat(4,1fr)}
 @media(max-width:900px){
- .wrap{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr)}
+ #ab{overflow:auto}
+ .wrap{height:auto;min-height:100%;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto}
+ .side{overflow:visible}
+ .noteCard{flex:none;min-height:380px}
+ .fill .cw{flex:none;height:clamp(260px,40dvh,480px)}
+ .chipsCard{max-height:160px}
  .bl{display:flex;overflow-x:auto;overflow-y:hidden;height:auto}.bl button{width:auto;white-space:nowrap;margin:0 6px 0 0}
  .edit{overflow:visible}
 }
@@ -106,7 +114,7 @@ textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
   <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option></select>
  </div>
  <div class="bar">
-  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.6</span>
+  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.7</span>
   <button class="act" id="bCsv">Export CSV</button><button class="act" id="bJson">Backup</button><button class="act" id="bRestore">Restore</button><input type="file" id="rf" accept=".json,application/json" class="hide"><button class="act" id="bReset">New session</button>
  </div>
 </header>
@@ -211,10 +219,11 @@ function dl(txt,name,type){try{var a=document.createElement('a');a.href=URL.crea
 function mkInk(host,get,set){
  var W=1000,H=700;
  host.innerHTML='<div class="itb"><button data-m="pen" class="on">Pen</button><button data-m="er">Eraser</button><button data-m="undo">Undo</button><button data-m="clr">Clear</button></div><div class="cw"><canvas width="'+W+'" height="'+H+'"></canvas></div>';
- var c=host.querySelector('canvas'),cw=host.querySelector('.cw'),x=c.getContext('2d'),mode='pen',down=false,last,pen=false,st=[],fill=host.classList.contains('fill');
- function fit(){var b=cw.getBoundingClientRect(),w=Math.min(b.width,fill?9999:760),h=w*H/W;if(fill&&b.height>40&&h>b.height){h=b.height;w=h*W/H}if(w>20){c.style.width=w+'px';c.style.height=h+'px'}}
+ var c=host.querySelector('canvas'),cw=host.querySelector('.cw'),x=c.getContext('2d'),mode='pen',down=false,last,pen=false,st=[],drawId=0;
+ // Resize only the display: keeping the bitmap intact preserves saved ink and undo.
+ function fit(){c.style.width='100%';c.style.height='100%'}
  function paper(){x.fillStyle='#fffef8';x.fillRect(0,0,W,H);x.strokeStyle='#e6e2d4';x.lineWidth=2;for(var y=50;y<H;y+=50){x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke()}}
- function draw(d){paper();if(d){var im=new Image();im.onload=function(){x.drawImage(im,0,0,W,H)};im.src=d}}
+ function draw(d,done){var id=++drawId;paper();if(d){var im=new Image();im.onload=function(){if(id!==drawId)return;x.drawImage(im,0,0,W,H);if(done)done()};im.src=d}else if(done)done()}
  function pt(e){var r=c.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
  c.addEventListener('pointerdown',function(e){if(e.pointerType=='pen')pen=true;if(e.pointerType=='touch'&&pen)return;e.preventDefault();down=true;c.setPointerCapture(e.pointerId);st.push(c.toDataURL());if(st.length>15)st.shift();last=pt(e)});
  c.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);x.lineCap='round';x.lineJoin='round';x.strokeStyle=mode=='er'?'#fffef8':'#14110f';x.lineWidth=mode=='er'?30:2+3*(e.pressure||.4);x.beginPath();x.moveTo(last[0],last[1]);x.lineTo(p[0],p[1]);x.stroke();last=p});
@@ -222,7 +231,7 @@ function mkInk(host,get,set){
  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
  host.querySelector('.itb').addEventListener('click',function(e){var m=e.target.dataset.m;if(!m)return;
   if(m=='pen'||m=='er'){mode=m;host.querySelectorAll('[data-m=pen],[data-m=er]').forEach(function(b){b.classList.toggle('on',b.dataset.m==m)})}
-  else if(m=='undo'){if(st.length){var d=st.pop();draw(d);setTimeout(function(){set(c.toDataURL('image/png'))},60)}}
+  else if(m=='undo'){if(st.length){var d=st.pop();draw(d,function(){set(c.toDataURL('image/png'))})}}
   else if(confirm('Clear this drawing?')){st=[];draw('');set('')}});
  if(window.ResizeObserver)new ResizeObserver(fit).observe(cw);
  return{fit:fit,load:function(){st=[];draw(get());fit()}};
