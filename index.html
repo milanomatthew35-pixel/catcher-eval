@@ -6,14 +6,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="Catcher Eval">
-<meta name="theme-color" content="#1f5c3f">
+<meta name="theme-color" content="#14110f">
 <style>
-:root{color-scheme:light dark;--bg:#f3f1ec;--card:#fff;--ink:#1d2a24;--mut:#6b766f;--line:#d6d9d2;--acc:#1f5c3f;--accT:#fff;--pos:#1f7a4a;--neg:#b3382c;--neu:#7a7f78}
-@media(prefers-color-scheme:dark){:root{--bg:#141a17;--card:#1d2621;--ink:#e8ede9;--mut:#93a097;--line:#34423a;--acc:#5fbf8a;--accT:#10201a;--pos:#5fd08f;--neg:#ee7b6e;--neu:#a0a79f}}
+:root{color-scheme:light dark;--bg:#efe6dc;--card:#fbf7f2;--ink:#14110f;--mut:#7a6552;--line:#d9c8b6;--acc:#171210;--accT:#fff;--pos:#7a4a23;--neg:#b3202a;--neu:#8c7b6b}
+@media(prefers-color-scheme:dark){:root{--bg:#0e0b0a;--card:#1c1614;--ink:#f1e6da;--mut:#ab9784;--line:#3b2d25;--acc:#a9693a;--accT:#fff;--pos:#b97a46;--neg:#e0453c;--neu:#8c7b6b}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.35 "Avenir Next",Avenir,"Helvetica Neue",Arial,sans-serif;-webkit-user-select:none;user-select:none}
 body{padding:env(safe-area-inset-top,0) 12px env(safe-area-inset-bottom,0)}
-header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;border-bottom:3px solid var(--neg)}
 .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;-webkit-user-select:text;user-select:text}
 .bar{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}.sp{flex:1}
@@ -64,7 +64,7 @@ textarea{min-height:70px;margin-top:8px}
   <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option></select>
  </div>
  <div class="bar">
-  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.4</span>
+  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.5</span>
   <button class="act" id="bCsv">Export CSV</button><button class="act" id="bJson">Backup</button><button class="act" id="bRestore">Restore</button><input type="file" id="rf" accept=".json,application/json" class="hide"><button class="act" id="bReset">New session</button>
  </div>
 </header>
@@ -170,7 +170,7 @@ function mkInk(host,get,set){
  function draw(d){paper();if(d){var im=new Image();im.onload=function(){x.drawImage(im,0,0)};im.src=d}}
  function pt(e){var r=c.getBoundingClientRect();return[(e.clientX-r.left)*1400/r.width,(e.clientY-r.top)*480/r.height]}
  c.addEventListener('pointerdown',function(e){if(e.pointerType=='pen')pen=true;if(e.pointerType=='touch'&&pen)return;e.preventDefault();down=true;c.setPointerCapture(e.pointerId);st.push(c.toDataURL());if(st.length>15)st.shift();last=pt(e)});
- c.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);x.lineCap='round';x.lineJoin='round';x.strokeStyle=mode=='er'?'#fffef8':'#1b2b6b';x.lineWidth=mode=='er'?34:2+4*(e.pressure||.4);x.beginPath();x.moveTo(last[0],last[1]);x.lineTo(p[0],p[1]);x.stroke();last=p});
+ c.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);x.lineCap='round';x.lineJoin='round';x.strokeStyle=mode=='er'?'#fffef8':'#14110f';x.lineWidth=mode=='er'?34:2+4*(e.pressure||.4);x.beginPath();x.moveTo(last[0],last[1]);x.lineTo(p[0],p[1]);x.stroke();last=p});
  function up(){if(down){down=false;set(c.toDataURL('image/png'))}}
  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
  host.querySelector('.itb').addEventListener('click',function(e){var m=e.target.dataset.m;if(!m)return;
