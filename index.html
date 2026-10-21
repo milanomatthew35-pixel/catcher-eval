@@ -70,7 +70,8 @@ header{flex:none;padding:6px 0}
 #sum .wide{grid-column:1/-1}
 .card{padding:10px;margin-bottom:0}.card h3{margin:0 0 6px;font-size:15px}
 .wrap{display:grid;grid-template-columns:118px minmax(0,1.35fr) minmax(300px,1fr);gap:10px;height:100%;margin-top:0;padding:8px 0}
-.wrap>*{min-height:0;min-width:0}
+.wrap>*{min-height:0}
+.isqBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0}.isqBar label{display:flex;align-items:center;gap:6px;font-size:13px}.isqBar select{width:auto;max-width:180px;padding:6px}#isqPanel{flex:none}
 .bl{overflow-y:auto;height:100%}.bl button{padding:8px;margin-bottom:5px}
 .edit{display:flex;flex-direction:column;overflow:auto}
 .top{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
@@ -87,22 +88,14 @@ header{flex:none;padding:6px 0}
 .side{min-height:0;overflow:hidden}
 .fill{flex:1;min-height:0;display:flex;flex-direction:column}
 .fill .cw{flex:1;min-height:0}
-.cw{width:100%;min-width:0;height:clamp(240px,38dvh,480px);overflow:hidden;border:1px solid var(--line);border-radius:8px}
-.fill .cw{height:auto}
-#inkB,#inkS{width:100%;min-width:0}
-.itb{flex-wrap:wrap;flex-shrink:0}
+.cw{display:flex;justify-content:center;align-items:flex-start}
 .itb{margin-bottom:4px}.itb button{padding:6px 10px}
-canvas{width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0}
+canvas{aspect-ratio:auto}
 textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
 #notes{height:90px;resize:vertical}
 .tot{grid-template-columns:repeat(4,1fr)}
 @media(max-width:900px){
- #ab{overflow:auto}
- .wrap{height:auto;min-height:100%;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto}
- .side{overflow:visible}
- .noteCard{flex:none;min-height:380px}
- .fill .cw{flex:none;height:clamp(260px,40dvh,480px)}
- .chipsCard{max-height:160px}
+ .wrap{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr)}
  .bl{display:flex;overflow-x:auto;overflow-y:hidden;height:auto}.bl button{width:auto;white-space:nowrap;margin:0 6px 0 0}
  .edit{overflow:visible}
 }
@@ -111,14 +104,15 @@ textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
 <header>
  <div class="meta">
   <input id="m_catcher" placeholder="Catcher"><input id="m_pitcher" placeholder="Pitcher">
-  <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option></select>
+  <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option><option>ISQ</option></select>
  </div>
  <div class="bar">
-  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v7.7</span>
+  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v8.0</span>
   <button class="act" id="bCsv">Export CSV</button><button class="act" id="bJson">Backup</button><button class="act" id="bRestore">Restore</button><input type="file" id="rf" accept=".json,application/json" class="hide"><button class="act" id="bReset">New session</button>
  </div>
 </header>
 
+<section id="isqPanel" class="hide"><div class="isqBar"><b>ISQ · <span id="isqHalf"></span></b><button class="act" id="isqNext">Next half-inning →</button><label>Active catcher <select id="isqCatcher"></select></label><label>Pitcher <select id="isqPitcher"></select></label><button class="act" id="isqAddC">+ Catcher</button><button class="act" id="isqAddP">+ Pitcher</button></div></section>
 <main id="ab"><div class="wrap">
  <div class="bl" id="bl"></div>
  <div class="card edit">
@@ -148,6 +142,7 @@ textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
 </div></main>
 
 <main id="sum" class="hide">
+ <div class="card wide" id="isqFilters" style="display:none"><h3>ISQ Comparison</h3><div class="cmp"><table id="isqCompare"></table></div><label>Breakdown for <select id="isqFilter"></select></label></div>
  <div class="card wide"><h3>Session totals</h3><div class="tot" id="tot"></div></div>
  <div class="card hide" id="cardInn"><h3>By inning</h3><div class="cmp"><table id="ci"></table></div></div>
  <div class="card"><h3>Pitch types used</h3><div class="cmp"><table id="cpt"></table></div></div>
@@ -159,17 +154,22 @@ textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
 </main>
 
 <script>
-var $=function(i){return document.getElementById(i)},KEY='catcherEval.v2',S;
+var $=function(i){return document.getElementById(i)},KEY='catcherEval.v2',ISQKEY='catcherEval.isq.v1',S,normalS,isqS;
 var OPT={s:['LKD','RKD','2PP','2PS'],t:['FB','CB','SL','CH','CT','SP'],r:['+','N','-'],k:['+','N','-'],p:['PB','WP'],h:['+','N','-'],x:['Whiff','Foul tip','Foul','In play'],u:['Ball','Strike']};
 var D,edit=-1,inkB,inkS;
 function newB(){return{h:'',pitches:[],ink:'',note:'',endInn:false}}
+function isqBlank(){var o=blank();o.m.session='ISQ';o.roster=[{id:'c1',name:'Home catcher',team:'Home'},{id:'c2',name:'Away catcher',team:'Away'}];o.pitchers=[{id:'p1',name:'Home pitcher',team:'Home'},{id:'p2',name:'Away pitcher',team:'Away'}];o.half=0;o.activeC='c1';o.activeP='p1';o.filter='all';o.batters=[isqB(o)];return o}
+function isqB(o){var b=newB();b.half=o.half;b.catcherId=o.activeC;b.pitcherId=o.activeP;return b}
+function isISQ(){return S.m.session==='ISQ'}
+function loadISQ(){try{var v=JSON.parse(localStorage.getItem(ISQKEY));if(v&&v.roster&&v.batters)return mig(v)}catch(e){}return isqBlank()}
+function saveISQ(){try{localStorage.setItem(ISQKEY,JSON.stringify(isqS))}catch(e){}}
 function blank(){return{m:{catcher:'',pitcher:'',date:new Date().toISOString().slice(0,10),session:'Bullpen'},batters:[newB()],cur:0,sink:'',notes:''}}
 function load(){try{var j=localStorage.getItem(KEY);if(j){var o=JSON.parse(j);if(o&&o.batters&&o.batters.length)return mig(o)}}catch(e){}return blank()}
 function mig(o){o.batters.forEach(function(b){b.pitches.forEach(function(p){['r','k','h'].forEach(function(f){if(p[f]==='0')p[f]='N'})})});return o}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{localStorage.setItem(isISQ()?ISQKEY:KEY,JSON.stringify(S))}catch(e){}}
 function B(){return S.batters[S.cur]}
-function showInn(){return S.m.session=='Game'||S.batters.some(function(b){return b.endInn})}
-function inns(){var n=1,a=[];S.batters.forEach(function(b){a.push(n);if(b.endInn)n++});return a}
+function showInn(){return S.m.session=='Game'||isISQ()||S.batters.some(function(b){return b.endInn})}
+function inns(){if(isISQ())return S.batters.map(function(b){return Math.floor((b.half||0)/2)+1});var n=1,a=[];S.batters.forEach(function(b){a.push(n);if(b.endInn)n++});return a}
 function reset(){D={s:D?D.s:'',t:'',z:'',r:'',k:'',p:'',h:'',x:'',u:'',ip:''};edit=-1}
 function lbl(v){return v=='-'?'\u2212':v}
 function seg(el,f,o){$(el).innerHTML=o.map(function(v){return'<button data-f="'+f+'" data-v="'+v+'" class="'+(D[f]==v?'on':'')+'">'+lbl(v)+'</button>'}).join('')}
@@ -192,9 +192,10 @@ function showB(i){S.cur=i;reset();save();renderEd();renderB();inkB.load();calc()
 function tally(rs,f){var p=0,z=0,m=0;rs.forEach(function(r){var v=r[f];if(v=='+')p++;else if(v=='N')z++;else if(v=='-')m++});return{p:p,z:z,m:m,o:p+z+m}}
 function cnt(rs,f,v){return rs.filter(function(r){return r[f]==v}).length}
 function pct(t){return t.o?Math.round(100*t.p/t.o)+'%':'\u2013'}
-function all(){var a=[];S.batters.forEach(function(b){b.pitches.forEach(function(p){var c={b:b.h};for(var k in p)c[k]=p[k];a.push(c)})});return a}
+function all(){var a=[];S.batters.forEach(function(b){b.pitches.forEach(function(p){var c={b:b.h,catcherId:b.catcherId,pitcherId:p.pitcherId||b.pitcherId,half:b.half};for(var k in p)c[k]=p[k];a.push(c)})});return a}
 function calc(){
- var R=all(),re=tally(R,'r'),bl=tally(R,'k'),th=tally(R,'h');
+ var allR=all(),R=isISQ()&&S.filter!=='all'?allR.filter(function(p){return p.catcherId===S.filter}):allR,re=tally(R,'r'),bl=tally(R,'k'),th=tally(R,'h');
+ if(isISQ()){ $('isqFilters').style.display='block';$('isqFilter').innerHTML='<option value="all">All catchers</option>'+S.roster.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqFilter').value=S.filter||'all';$('isqCompare').innerHTML='<thead><tr><th>Catcher</th><th>Pitches</th><th>REC +/opp</th><th>BLK +/opp</th><th>PB</th><th>WP</th><th>THR +/opp</th></tr></thead><tbody>'+S.roster.map(function(c){var ps=allR.filter(function(p){return p.catcherId===c.id}),r=tally(ps,'r'),b=tally(ps,'k'),h=tally(ps,'h');return '<tr><td>'+esc(c.name)+'</td><td>'+ps.length+'</td><td>'+r.p+'/'+r.o+'</td><td>'+b.p+'/'+b.o+'</td><td>'+cnt(ps,'p','PB')+'</td><td>'+cnt(ps,'p','WP')+'</td><td>'+h.p+'/'+h.o+'</td></tr>'}).join('')+'</tbody>';}else $('isqFilters').style.display='none';
  function box(t,a,b){return'<div><b>'+t+'</b><span>'+a+'</span><small>'+b+'</small></div>'}
  function g(t){return[t.p+' + / '+t.z+' N / '+t.m+' \u2212',t.o+' opp, '+pct(t)+' positive']}
  $('tot').innerHTML=box('Pitches charted',R.length,S.batters.length+' batters')+box('Receiving',g(re)[0],g(re)[1])+box('Blocking',g(bl)[0],g(bl)[1])+box('Throw downs',g(th)[0],g(th)[1])+box('Passed balls',cnt(R,'p','PB'),'')+box('Wild pitches',cnt(R,'p','WP'),'')+box('Called balls',cnt(R,'u','Ball'),'')+box('Called strikes',cnt(R,'u','Strike'),'')+box('Whiffs',cnt(R,'x','Whiff'),'')+box('Foul tips',cnt(R,'x','Foul tip'),'')+box('Fouls',cnt(R,'x','Foul'),'')+box('Balls in play',cnt(R,'x','In play'),'');
@@ -207,23 +208,23 @@ function calc(){
  $('ci').innerHTML=hd('Inning').replace('<th>Pitches</th>','<th>Batters</th><th>Pitches</th>')+Object.keys(m).map(function(n){var ps=[];m[n].forEach(function(b){b.pitches.forEach(function(p){ps.push(p)})});return ln('Inning '+n,ps).replace('</td><td>','</td><td>'+m[n].length+'</td><td>')}).join('')+'</tbody>';
  function dist(el,label,f,o){var n=R.filter(function(r){return r[f]}).length;$(el).innerHTML='<thead><tr><th>'+label+'</th><th>Count</th><th>%</th></tr></thead><tbody>'+o.map(function(v){var c=cnt(R,f,v);return'<tr><td>'+v+'</td><td>'+c+'</td><td>'+(n?Math.round(1000*c/n)/10+'%':'\u2013')+'</td></tr>'}).join('')+'<tr><td>Pitches recorded</td><td>'+n+'</td><td></td></tr></tbody>'}
  dist('cpt','Pitch type','t',OPT.t);dist('cst','Stance','s',OPT.s);
- $('cb').innerHTML=hd('Batter')+S.batters.map(function(b,i){return ln((i+1)+' '+(b.h||''),b.pitches)}).join('')+'</tbody>';
+ $('cb').innerHTML=hd('Batter')+S.batters.map(function(b,i){return ln((i+1)+' '+(b.h||''),isISQ()&&S.filter!=='all'&&b.catcherId!==S.filter?[]:b.pitches)}).join('')+'</tbody>';
 }
+function esc(x){return String(x||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function csv(){
  var q=function(x){return'"'+String(x).replace(/"/g,'""')+'"'};
- var L=[['Catcher',S.m.catcher,'Pitcher',S.m.pitcher,'Date',S.m.date,'Session',S.m.session].map(q).join(','),'Batter,Inning,Hand,Pitch,Stance,Type,Zone,REC,BLK,PB/WP,THR,Umpire,Result,Play'];
- S.batters.forEach(function(b,i){b.pitches.forEach(function(p,j){L.push([i+1,showInn()?inns()[i]:'',b.h,j+1,p.s,p.t,p.z,p.r,p.k,p.p,p.h,p.u||'',p.x||'',q(p.ip||'')].join(','))});if(b.note)L.push([i+1,'','','note',q(b.note)].join(','))});
+ var L=[['Catcher',S.m.catcher,'Pitcher',S.m.pitcher,'Date',S.m.date,'Session',S.m.session].map(q).join(','),'Batter,Inning,Half,Hand,Catcher,Pitcher,Pitch,Stance,Type,Zone,REC,BLK,PB/WP,THR,Umpire,Result,Play'];
+ S.batters.forEach(function(b,i){b.pitches.forEach(function(p,j){L.push([i+1,showInn()?inns()[i]:'',isISQ()?((b.half%2)?'Bottom':'Top'):'',b.h,isISQ()?q((S.roster.find(function(c){return c.id===b.catcherId})||{}).name||''):'',isISQ()?q((S.pitchers.find(function(c){return c.id===(p.pitcherId||b.pitcherId)})||{}).name||''):'',j+1,p.s,p.t,p.z,p.r,p.k,p.p,p.h,p.u||'',p.x||'',q(p.ip||'')].join(','))});if(b.note)L.push([i+1,'','','note',q(b.note)].join(','))});
  L.push('Session notes,'+q(S.notes));return L.join('\n');
 }
 function dl(txt,name,type){try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove()}catch(e){alert('Download is not available here.')}}
 function mkInk(host,get,set){
  var W=1000,H=700;
  host.innerHTML='<div class="itb"><button data-m="pen" class="on">Pen</button><button data-m="er">Eraser</button><button data-m="undo">Undo</button><button data-m="clr">Clear</button></div><div class="cw"><canvas width="'+W+'" height="'+H+'"></canvas></div>';
- var c=host.querySelector('canvas'),cw=host.querySelector('.cw'),x=c.getContext('2d'),mode='pen',down=false,last,pen=false,st=[],drawId=0;
- // Resize only the display: keeping the bitmap intact preserves saved ink and undo.
- function fit(){c.style.width='100%';c.style.height='100%'}
+ var c=host.querySelector('canvas'),cw=host.querySelector('.cw'),x=c.getContext('2d'),mode='pen',down=false,last,pen=false,st=[],fill=host.classList.contains('fill');
+ function fit(){var b=cw.getBoundingClientRect(),w=Math.min(b.width,fill?9999:760),h=w*H/W;if(fill&&b.height>40&&h>b.height){h=b.height;w=h*W/H}if(w>20){c.style.width=w+'px';c.style.height=h+'px'}}
  function paper(){x.fillStyle='#fffef8';x.fillRect(0,0,W,H);x.strokeStyle='#e6e2d4';x.lineWidth=2;for(var y=50;y<H;y+=50){x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke()}}
- function draw(d,done){var id=++drawId;paper();if(d){var im=new Image();im.onload=function(){if(id!==drawId)return;x.drawImage(im,0,0,W,H);if(done)done()};im.src=d}else if(done)done()}
+ function draw(d){paper();if(d){var im=new Image();im.onload=function(){x.drawImage(im,0,0,W,H)};im.src=d}}
  function pt(e){var r=c.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
  c.addEventListener('pointerdown',function(e){if(e.pointerType=='pen')pen=true;if(e.pointerType=='touch'&&pen)return;e.preventDefault();down=true;c.setPointerCapture(e.pointerId);st.push(c.toDataURL());if(st.length>15)st.shift();last=pt(e)});
  c.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);x.lineCap='round';x.lineJoin='round';x.strokeStyle=mode=='er'?'#fffef8':'#14110f';x.lineWidth=mode=='er'?30:2+3*(e.pressure||.4);x.beginPath();x.moveTo(last[0],last[1]);x.lineTo(p[0],p[1]);x.stroke();last=p});
@@ -231,7 +232,7 @@ function mkInk(host,get,set){
  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
  host.querySelector('.itb').addEventListener('click',function(e){var m=e.target.dataset.m;if(!m)return;
   if(m=='pen'||m=='er'){mode=m;host.querySelectorAll('[data-m=pen],[data-m=er]').forEach(function(b){b.classList.toggle('on',b.dataset.m==m)})}
-  else if(m=='undo'){if(st.length){var d=st.pop();draw(d,function(){set(c.toDataURL('image/png'))})}}
+  else if(m=='undo'){if(st.length){var d=st.pop();draw(d);setTimeout(function(){set(c.toDataURL('image/png'))},60)}}
   else if(confirm('Clear this drawing?')){st=[];draw('');set('')}});
  if(window.ResizeObserver)new ResizeObserver(fit).observe(cw);
  return{fit:fit,load:function(){st=[];draw(get());fit()}};
@@ -243,30 +244,38 @@ document.addEventListener('click',function(e){
  if(d.f){D[d.f]=D[d.f]==d.v?'':d.v;if(d.f=='x'&&D.x!='In play')D.ip='';renderEd()}
  else if(d.hand){B().h=B().h==d.hand?'':d.hand;save();renderEd();renderB();calc()}
  else if(d.b!==undefined)showB(+d.b);
- else if(d.newb){S.batters.push(newB());showB(S.batters.length-1)}
+ else if(d.newb){S.batters.push(isISQ()?isqB(S):newB());showB(S.batters.length-1)}
  else if(d.p!==undefined){edit=+d.p;D={};for(var k in B().pitches[edit])D[k]=B().pitches[edit][k];renderEd();renderB()}
- else if(b.id=='add'){var p={};for(var k in D)p[k]=D[k];if(edit>=0)B().pitches[edit]=p;else B().pitches.push(p);reset();save();renderEd();renderB();calc()}
+ else if(b.id=='add'){var p={};for(var k in D)p[k]=D[k];if(isISQ())p.pitcherId=S.activeP;if(edit>=0)B().pitches[edit]=p;else B().pitches.push(p);reset();save();renderEd();renderB();calc()}
  else if(b.id=='del'){B().pitches.splice(edit,1);reset();save();renderEd();renderB();calc()}
  else if(b.id=='cancel'){reset();renderEd();renderB()}
  else if(b.id=='endInn'){B().endInn=!B().endInn;save();renderEd();renderB();calc()}
- else if(b.id=='endNext'){B().endInn=true;S.batters.push(newB());showB(S.batters.length-1)}
- else if(b.id=='nextB'){S.batters.push(newB());showB(S.batters.length-1)}
- else if(b.id=='delB'){if(confirm('Delete batter '+(S.cur+1)+' and all of its pitches and notes?')){S.batters.splice(S.cur,1);if(!S.batters.length)S.batters.push(newB());showB(Math.min(S.cur,S.batters.length-1))}}
+ else if(b.id=='endNext'){if(isISQ()){nextHalf();return}B().endInn=true;S.batters.push(newB());showB(S.batters.length-1)}
+ else if(b.id=='nextB'){S.batters.push(isISQ()?isqB(S):newB());showB(S.batters.length-1)}
+ else if(b.id=='delB'){if(confirm('Delete batter '+(S.cur+1)+' and all of its pitches and notes?')){S.batters.splice(S.cur,1);if(!S.batters.length)S.batters.push(isISQ()?isqB(S):newB());showB(Math.min(S.cur,S.batters.length-1))}}
 });
-['catcher','pitcher','date','session'].forEach(function(k){$('m_'+k).addEventListener('input',function(){S.m[k]=this.value;save();if(k=='session'){renderEd();renderB();calc()}})});
+['catcher','pitcher','date','session'].forEach(function(k){$('m_'+k).addEventListener('input',function(){if(k==='session')return;S.m[k]=this.value;save();})});
 $('ipin').addEventListener('input',function(){D.ip=this.value});
 $('noteB').addEventListener('input',function(){B().note=this.value;save()});
 $('notes').addEventListener('input',function(){S.notes=this.value;save()});
 $('bCsv').onclick=function(){dl(csv(),'catcher-eval-'+S.m.date+'.csv','text/csv')};
 $('bJson').onclick=function(){dl(JSON.stringify(S),'catcher-eval-backup-'+S.m.date+'.json','application/json')};
-$('bReset').onclick=function(){if(confirm('Clear everything and start a new session? Export or back up first if you need this one.')){S=blank();D=null;save();init()}};
-$('m_session').addEventListener('change',function(){S.m.session=this.value;save();renderEd();renderB();calc()});
+$('bReset').onclick=function(){if(confirm('Clear the current '+S.m.session+' session? Export or back up first.')){if(isISQ()){isqS=isqBlank();S=isqS}else{normalS=blank();normalS.m.session=$('m_session').value;S=normalS}D=null;save();init()}};
+$('m_session').addEventListener('change',function(){switchMode(this.value)});
 $('bRestore').onclick=function(){$('rf').click()};
-$('rf').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);if(!o.m||!o.batters||!o.batters.length)throw 0;if(confirm('Replace the current session with this backup?')){S=mig(o);S.cur=0;D=null;save();init()}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f);this.value=''};
-function init(){reset();$('m_catcher').value=S.m.catcher;$('m_pitcher').value=S.m.pitcher;$('m_date').value=S.m.date;$('m_session').value=S.m.session;$('notes').value=S.notes;
+$('rf').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);if(!o.m||!o.batters||!o.batters.length)throw 0;if(confirm('Replace the current session with this backup?')){S=mig(o);S.cur=0;if(S.m.session==='ISQ'){isqS=S}else{normalS=S}D=null;save();init()}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f);this.value=''};
+function renderISQ(){var on=isISQ();$('isqPanel').classList.toggle('hide',!on);if(!on)return;var h=S.half||0;$('isqHalf').textContent=((h%2)?'Bottom':'Top')+' '+(Math.floor(h/2)+1);$('isqCatcher').innerHTML=S.roster.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqCatcher').value=S.activeC;$('isqPitcher').innerHTML=S.pitchers.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqPitcher').value=S.activeP}
+function switchMode(v){if(isISQ())isqS=S;else normalS=S;if(v==='ISQ'){S=isqS}else{S=normalS;S.m.session=v}S.cur=Math.min(S.cur,S.batters.length-1);save();init()}
+function nextHalf(){if(!isISQ())return;S.half++;var team=S.half%2?'Away':'Home',c=S.roster.find(function(x){return x.team===team}),p=S.pitchers.find(function(x){return x.team===team});if(c)S.activeC=c.id;if(p)S.activeP=p.id;S.batters.push(isqB(S));showB(S.batters.length-1);renderISQ()}
+function newPlayer(kind){if(!isISQ())return;var isC=kind==='c',name=prompt(isC?'New catcher name':'New pitcher name');if(!name||!name.trim())return;var team=prompt('Team (Home or Away)?',S.half%2?'Away':'Home');team=/^away$/i.test(team||'')?'Away':'Home';var arr=isC?S.roster:S.pitchers,id=(isC?'c':'p')+Date.now();arr.push({id:id,name:name.trim(),team:team});if(isC){S.activeC=id;S.batters.push(isqB(S));showB(S.batters.length-1)}else S.activeP=id;save();renderISQ();calc()}
+$('isqNext').onclick=nextHalf;$('isqAddC').onclick=function(){newPlayer('c')};$('isqAddP').onclick=function(){newPlayer('p')};
+$('isqCatcher').onchange=function(){S.activeC=this.value;var b=B();if(b.pitches.length||b.catcherId!==S.activeC){S.batters.push(isqB(S));showB(S.batters.length-1)}else{b.catcherId=S.activeC;save()}renderISQ()};
+$('isqPitcher').onchange=function(){S.activeP=this.value;B().pitcherId=this.value;save()};
+$('isqFilter').onchange=function(){S.filter=this.value;save();calc()};
+function init(){reset();renderISQ();$('m_catcher').value=S.m.catcher;$('m_pitcher').value=S.m.pitcher;$('m_date').value=S.m.date;$('m_session').value=S.m.session;$('notes').value=S.notes;
  inkB=inkB||mkInk($('inkB'),function(){return B().ink},function(v){B().ink=v;save()});
  inkS=inkS||mkInk($('inkS'),function(){return S.sink},function(v){S.sink=v;save()});
  if(S.cur>=S.batters.length)S.cur=0;renderEd();renderB();inkB.load();inkS.load();calc()}
-S=load();init();window.addEventListener('resize',function(){inkB.fit();inkS.fit()});setTimeout(function(){inkB.fit()},150);
+normalS=load();if(normalS.m.session==='ISQ')normalS.m.session='Game';isqS=loadISQ();S=normalS;init();window.addEventListener('resize',function(){inkB.fit();inkS.fit()});setTimeout(function(){inkB.fit()},150);
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js')}catch(e){}
 </script></body></html>
