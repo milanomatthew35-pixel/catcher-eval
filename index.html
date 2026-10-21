@@ -107,12 +107,12 @@ textarea{min-height:44px;height:44px;margin-top:6px;resize:none}
   <input id="m_date" type="date"><select id="m_session"><option>Bullpen</option><option>Game</option><option>ISQ</option></select>
  </div>
  <div class="bar">
-  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v8.0</span>
+  <button class="tab on" data-tab="ab">At-bats</button><button class="tab" data-tab="sum">Breakdown</button><span class="sp"></span><span style="color:var(--mut);font-size:13px">v8.1</span>
   <button class="act" id="bCsv">Export CSV</button><button class="act" id="bJson">Backup</button><button class="act" id="bRestore">Restore</button><input type="file" id="rf" accept=".json,application/json" class="hide"><button class="act" id="bReset">New session</button>
  </div>
 </header>
 
-<section id="isqPanel" class="hide"><div class="isqBar"><b>ISQ · <span id="isqHalf"></span></b><button class="act" id="isqNext">Next half-inning →</button><label>Active catcher <select id="isqCatcher"></select></label><label>Pitcher <select id="isqPitcher"></select></label><button class="act" id="isqAddC">+ Catcher</button><button class="act" id="isqAddP">+ Pitcher</button></div></section>
+<section id="isqPanel" class="hide"><div class="isqBar"><label>Home starting catcher <input id="isqHomeName" placeholder="Home catcher"></label><label>Away starting catcher <input id="isqAwayName" placeholder="Away catcher"></label></div><div class="isqBar"><b>ISQ · <span id="isqHalf"></span></b><button class="act" id="isqNext">Next half-inning →</button><label>Active catcher <select id="isqCatcher"></select></label><label>Pitcher <select id="isqPitcher"></select></label><button class="act" id="isqAddC">+ Catcher</button><button class="act" id="isqAddP">+ Pitcher</button></div></section>
 <main id="ab"><div class="wrap">
  <div class="bl" id="bl"></div>
  <div class="card edit">
@@ -159,6 +159,23 @@ var OPT={s:['LKD','RKD','2PP','2PS'],t:['FB','CB','SL','CH','CT','SP'],r:['+','N
 var D,edit=-1,inkB,inkS;
 function newB(){return{h:'',pitches:[],ink:'',note:'',endInn:false}}
 function isqBlank(){var o=blank();o.m.session='ISQ';o.roster=[{id:'c1',name:'Home catcher',team:'Home'},{id:'c2',name:'Away catcher',team:'Away'}];o.pitchers=[{id:'p1',name:'Home pitcher',team:'Home'},{id:'p2',name:'Away pitcher',team:'Away'}];o.half=0;o.activeC='c1';o.activeP='p1';o.filter='all';o.batters=[isqB(o)];return o}
+function defenseTeam(){return S.half%2?'Away':'Home'}
+function prepareISQ(o){
+ o.half=o.half||0;o.defenseC=o.defenseC||{};o.defenseP=o.defenseP||{};o.starters=o.starters||{};
+ ['Home','Away'].forEach(function(team){
+  var cs=o.roster.filter(function(c){return c.team===team}),ps=o.pitchers.filter(function(p){return p.team===team});
+  if(!o.starters[team]&&cs.length)o.starters[team]=cs[0].id;
+  if(!o.defenseC[team]){var prior=o.batters.slice().reverse().find(function(b){return cs.some(function(c){return c.id===b.catcherId})});o.defenseC[team]=prior?prior.catcherId:(cs[0]||{}).id}
+  if(!o.defenseP[team])o.defenseP[team]=(ps[0]||{}).id;
+ });
+ var team=o.half%2?'Away':'Home';
+ if(o.roster.some(function(c){return c.id===o.activeC&&c.team===team}))o.defenseC[team]=o.activeC;
+ if(o.pitchers.some(function(p){return p.id===o.activeP&&p.team===team}))o.defenseP[team]=o.activeP;
+ o.activeC=o.defenseC[team];o.activeP=o.defenseP[team];
+ if(!o.batters[o.cur]||(o.batters[o.cur].half||0)!==o.half){o.cur=o.batters.findIndex(function(b){return (b.half||0)===o.half});if(o.cur<0){o.batters.push(isqB(o));o.cur=o.batters.length-1}}
+ return o;
+}
+function selectCatcher(id){if(id===S.activeC)return;S.activeC=id;S.defenseC[defenseTeam()]=id;var b=B();if(b.pitches.length||b.note||b.ink){S.batters.push(isqB(S));showB(S.batters.length-1)}else{b.catcherId=id;save();renderB()}renderISQ();calc()}
 function isqB(o){var b=newB();b.half=o.half;b.catcherId=o.activeC;b.pitcherId=o.activeP;return b}
 function isISQ(){return S.m.session==='ISQ'}
 function loadISQ(){try{var v=JSON.parse(localStorage.getItem(ISQKEY));if(v&&v.roster&&v.batters)return mig(v)}catch(e){}return isqBlank()}
@@ -177,13 +194,13 @@ function renderEd(){
  ['s','t','r','k','p','h','u','x'].forEach(function(f){seg('f_'+f,f,OPT[f])});
  $('f_z').innerHTML=[1,2,3,4,5,6,7,8,9].map(function(n){return'<button data-f="z" data-v="'+n+'" class="'+(D.z==n?'on':'')+'">'+n+'</button>'}).join('');
  $('hand').innerHTML=['LHH','RHH'].map(function(v){return'<button data-hand="'+v+'" class="'+(B().h==v?'on':'')+'">'+v+'</button>'}).join('');
- seg('f_ip','ip',['1B','2B','3B','HR','E','FC']);$('endInn').classList.remove('hide');$('endNext').classList.remove('hide');$('endInn').classList.toggle('on',!!B().endInn);$('endInn').textContent=B().endInn?'Inning ends after batter \u2713':'End inning after batter';$('ipw').classList.toggle('hide',D.x!='In play');$('ipin').value=D.ip||'';
+ seg('f_ip','ip',['1B','2B','3B','HR','E','FC']);$('endInn').classList.remove('hide');$('endNext').classList.remove('hide');$('endInn').classList.toggle('on',!!B().endInn);$('endInn').textContent=isISQ()?'End half-inning':B().endInn?'Inning ends after batter \u2713':'End inning after batter';$('ipw').classList.toggle('hide',D.x!='In play');$('ipin').value=D.ip||'';
  $('add').textContent=edit>=0?'Update pitch '+(edit+1):'Add pitch';
  $('del').classList.toggle('hide',edit<0);$('cancel').classList.toggle('hide',edit<0);
 }
 function chip(p,i){return(i+1)+' '+(p.t||'\u2013')+(p.z?' Z'+p.z:'')+(p.r?' R'+lbl(p.r):'')+(p.k?' B'+lbl(p.k):'')+(p.p?' '+p.p:'')+(p.h?' T'+lbl(p.h):'')+(p.u?' '+p.u:'')+(p.x?' '+p.x+(p.ip?' '+p.ip:''):'')}
 function renderB(){var IN=inns();
- $('bl').innerHTML=S.batters.map(function(b,i){return'<button data-b="'+i+'" class="'+(i==S.cur?'on':'')+'">Batter '+(i+1)+' '+(b.h||'')+'<small>'+b.pitches.length+' pitches'+(showInn()?' \u00b7 Inn '+IN[i]+(b.endInn?' (end)':''):'')+'</small></button>'}).join('')+'<button data-newb="1">+ New batter</button>';
+ $('bl').innerHTML=S.batters.map(function(b,i){if(isISQ()&&(b.half||0)!==S.half)return '';return'<button data-b="'+i+'" class="'+(i==S.cur?'on':'')+'">Batter '+(i+1)+' '+(b.h||'')+'<small>'+b.pitches.length+' pitches'+(showInn()?' \u00b7 Inn '+IN[i]+(b.endInn?' (end)':''):'')+'</small></button>'}).join('')+'<button data-newb="1">+ New batter</button>';
  $('pt').textContent='Batter '+(S.cur+1)+' pitches ('+B().pitches.length+')';
  $('chips').innerHTML=B().pitches.length?B().pitches.map(function(p,i){return'<button data-p="'+i+'" class="'+(i==edit?'on':'')+'">'+chip(p,i)+'</button>'}).join(''):'<span style="color:var(--mut)">No pitches yet. Chart one above and tap Add pitch.</span>';
  $('noteB').value=B().note;
@@ -249,10 +266,10 @@ document.addEventListener('click',function(e){
  else if(b.id=='add'){var p={};for(var k in D)p[k]=D[k];if(isISQ())p.pitcherId=S.activeP;if(edit>=0)B().pitches[edit]=p;else B().pitches.push(p);reset();save();renderEd();renderB();calc()}
  else if(b.id=='del'){B().pitches.splice(edit,1);reset();save();renderEd();renderB();calc()}
  else if(b.id=='cancel'){reset();renderEd();renderB()}
- else if(b.id=='endInn'){B().endInn=!B().endInn;save();renderEd();renderB();calc()}
+ else if(b.id=='endInn'){if(isISQ()){nextHalf();return}B().endInn=!B().endInn;save();renderEd();renderB();calc()}
  else if(b.id=='endNext'){if(isISQ()){nextHalf();return}B().endInn=true;S.batters.push(newB());showB(S.batters.length-1)}
  else if(b.id=='nextB'){S.batters.push(isISQ()?isqB(S):newB());showB(S.batters.length-1)}
- else if(b.id=='delB'){if(confirm('Delete batter '+(S.cur+1)+' and all of its pitches and notes?')){S.batters.splice(S.cur,1);if(!S.batters.length)S.batters.push(isISQ()?isqB(S):newB());showB(Math.min(S.cur,S.batters.length-1))}}
+ else if(b.id=='delB'){if(confirm('Delete batter '+(S.cur+1)+' and all of its pitches and notes?')){S.batters.splice(S.cur,1);if(isISQ()){var i=S.batters.findIndex(function(b){return (b.half||0)===S.half});if(i<0){S.batters.push(isqB(S));i=S.batters.length-1}showB(i)}else{if(!S.batters.length)S.batters.push(newB());showB(Math.min(S.cur,S.batters.length-1))}}}
 });
 ['catcher','pitcher','date','session'].forEach(function(k){$('m_'+k).addEventListener('input',function(){if(k==='session')return;S.m[k]=this.value;save();})});
 $('ipin').addEventListener('input',function(){D.ip=this.value});
@@ -264,13 +281,14 @@ $('bReset').onclick=function(){if(confirm('Clear the current '+S.m.session+' ses
 $('m_session').addEventListener('change',function(){switchMode(this.value)});
 $('bRestore').onclick=function(){$('rf').click()};
 $('rf').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);if(!o.m||!o.batters||!o.batters.length)throw 0;if(confirm('Replace the current session with this backup?')){S=mig(o);S.cur=0;if(S.m.session==='ISQ'){isqS=S}else{normalS=S}D=null;save();init()}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f);this.value=''};
-function renderISQ(){var on=isISQ();$('isqPanel').classList.toggle('hide',!on);if(!on)return;var h=S.half||0;$('isqHalf').textContent=((h%2)?'Bottom':'Top')+' '+(Math.floor(h/2)+1);$('isqCatcher').innerHTML=S.roster.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqCatcher').value=S.activeC;$('isqPitcher').innerHTML=S.pitchers.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqPitcher').value=S.activeP}
+function renderISQ(){var on=isISQ();$('isqPanel').classList.toggle('hide',!on);if(!on)return;prepareISQ(S);['Home','Away'].forEach(function(team){var c=S.roster.find(function(c){return c.id===S.starters[team]});$('isq'+team+'Name').value=c?c.name:''});var h=S.half||0;$('isqHalf').textContent=((h%2)?'Bottom':'Top')+' '+(Math.floor(h/2)+1);$('isqCatcher').innerHTML=S.roster.filter(function(c){return c.team===defenseTeam()}).map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqCatcher').value=S.activeC;$('isqPitcher').innerHTML=S.pitchers.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>'}).join('');$('isqPitcher').value=S.activeP}
 function switchMode(v){if(isISQ())isqS=S;else normalS=S;if(v==='ISQ'){S=isqS}else{S=normalS;S.m.session=v}S.cur=Math.min(S.cur,S.batters.length-1);save();init()}
-function nextHalf(){if(!isISQ())return;S.half++;var team=S.half%2?'Away':'Home',c=S.roster.find(function(x){return x.team===team}),p=S.pitchers.find(function(x){return x.team===team});if(c)S.activeC=c.id;if(p)S.activeP=p.id;S.batters.push(isqB(S));showB(S.batters.length-1);renderISQ()}
-function newPlayer(kind){if(!isISQ())return;var isC=kind==='c',name=prompt(isC?'New catcher name':'New pitcher name');if(!name||!name.trim())return;var team=prompt('Team (Home or Away)?',S.half%2?'Away':'Home');team=/^away$/i.test(team||'')?'Away':'Home';var arr=isC?S.roster:S.pitchers,id=(isC?'c':'p')+Date.now();arr.push({id:id,name:name.trim(),team:team});if(isC){S.activeC=id;S.batters.push(isqB(S));showB(S.batters.length-1)}else S.activeP=id;save();renderISQ();calc()}
+function nextHalf(){if(!isISQ())return;B().endInn=true;S.half++;var team=defenseTeam();S.activeC=S.defenseC[team];S.activeP=S.defenseP[team];S.batters.push(isqB(S));showB(S.batters.length-1);renderISQ()}
+function newPlayer(kind){if(!isISQ())return;var isC=kind==='c',name=prompt(isC?'New catcher name':'New pitcher name');if(!name||!name.trim())return;var team=prompt('Team (Home or Away)?',defenseTeam());if(team===null)return;team=/^away$/i.test(team)?'Away':'Home';var arr=isC?S.roster:S.pitchers,id=(isC?'c':'p')+Date.now();arr.push({id:id,name:name.trim(),team:team});if(isC){S.defenseC[team]=id;if(team===defenseTeam())selectCatcher(id)}else{S.defenseP[team]=id;if(team===defenseTeam())S.activeP=id}save();renderISQ();calc()}
 $('isqNext').onclick=nextHalf;$('isqAddC').onclick=function(){newPlayer('c')};$('isqAddP').onclick=function(){newPlayer('p')};
-$('isqCatcher').onchange=function(){S.activeC=this.value;var b=B();if(b.pitches.length||b.catcherId!==S.activeC){S.batters.push(isqB(S));showB(S.batters.length-1)}else{b.catcherId=S.activeC;save()}renderISQ()};
-$('isqPitcher').onchange=function(){S.activeP=this.value;B().pitcherId=this.value;save()};
+$('isqCatcher').onchange=function(){selectCatcher(this.value)};
+$('isqPitcher').onchange=function(){S.activeP=this.value;var p=S.pitchers.find(function(p){return p.id===S.activeP});if(p)S.defenseP[p.team]=p.id;save()};
+['Home','Away'].forEach(function(team){$('isq'+team+'Name').addEventListener('input',function(){var c=S.roster.find(function(c){return c.id===S.starters[team]});if(c)c.name=this.value;save();calc()});$('isq'+team+'Name').addEventListener('change',renderISQ)});
 $('isqFilter').onchange=function(){S.filter=this.value;save();calc()};
 function init(){reset();renderISQ();$('m_catcher').value=S.m.catcher;$('m_pitcher').value=S.m.pitcher;$('m_date').value=S.m.date;$('m_session').value=S.m.session;$('notes').value=S.notes;
  inkB=inkB||mkInk($('inkB'),function(){return B().ink},function(v){B().ink=v;save()});
