@@ -1,4 +1,4 @@
-var V='catcher-eval-v8-1';
+var V='catcher-eval-v8-2';
 var A=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 function net(req){return new Promise(function(res,rej){var t=setTimeout(rej,3000);fetch(req).then(function(r){clearTimeout(t);res(r)},function(e){clearTimeout(t);rej(e)})})}
 self.addEventListener('install',function(e){e.waitUntil(caches.open(V).then(function(c){return Promise.all(A.map(function(u){return fetch(new Request(u,{cache:'reload'})).then(function(r){return c.put(u,r)})}))}).then(function(){return self.skipWaiting()}))});
